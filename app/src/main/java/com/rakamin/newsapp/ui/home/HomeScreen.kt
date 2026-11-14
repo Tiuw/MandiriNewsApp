@@ -2,6 +2,7 @@
 package com.rakamin.newsapp.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +40,7 @@ import com.rakamin.newsapp.domain.model.News
 
 @Composable
 fun HomeScreen(
+    onNewsClick: (News) -> Unit,
     viewModel: HomeViewModel = viewModel(
         factory = HomeViewModelFactory()
     )
@@ -106,7 +108,8 @@ fun HomeScreen(
 
                 else -> {
                     HeadlineCard(
-                        news = uiState.headlines.first()
+                        news = uiState.headlines.first(),
+                        onClick = onNewsClick
                     )
                 }
             }
@@ -169,7 +172,10 @@ fun HomeScreen(
             val article = newsItems[index]
 
             if (article != null) {
-                NewsItem(news = article)
+                NewsItem(
+                    news = article,
+                    onClick = onNewsClick
+                )
             }
         }
 
@@ -268,9 +274,16 @@ private fun GreetingSection() {
 }
 
 @Composable
-private fun HeadlineCard(news: News) {
+private fun HeadlineCard(
+    news: News,
+    onClick: (News) -> Unit
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                onClick(news)
+            },
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primary
@@ -310,11 +323,17 @@ private fun HeadlineCard(news: News) {
 }
 
 @Composable
-private fun NewsItem(news: News) {
+private fun NewsItem(
+    news: News,
+    onClick: (News) -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp),
+            .padding(bottom = 12.dp)
+            .clickable {
+                onClick(news)
+            },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
