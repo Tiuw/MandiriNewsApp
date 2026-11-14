@@ -16,18 +16,25 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SearchBar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -38,7 +45,11 @@ import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.rakamin.newsapp.domain.model.News
 import com.rakamin.newsapp.ui.components.NewsImage
+import com.rakamin.newsapp.ui.search.SearchViewModel
+import com.rakamin.newsapp.ui.search.SearchViewModelFactory
 import com.rakamin.newsapp.ui.util.toFormattedDate
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.runtime.setValue
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,17 +58,34 @@ fun HomeScreen(
     onNewsClick: (News) -> Unit,
     viewModel: HomeViewModel = viewModel(
         factory = HomeViewModelFactory()
+    ),
+    searchViewModel: SearchViewModel = viewModel(
+        factory = SearchViewModelFactory()
     )
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val searchUiState by searchViewModel.uiState.collectAsState()
+
     val newsItems = viewModel.newsPagingFlow.collectAsLazyPagingItems()
+    val searchItems = searchViewModel.searchResults.collectAsLazyPagingItems()
+
+    var isSearchActive by remember { mutableStateOf(false) }
 
     PullToRefreshBox(
-        isRefreshing = newsItems.loadState.refresh is LoadState.Loading &&
-                newsItems.itemCount > 0,
+        isRefreshing = if (isSearchActive) {
+            searchItems.loadState.refresh is LoadState.Loading &&
+                    searchItems.itemCount > 0
+        } else {
+            newsItems.loadState.refresh is LoadState.Loading &&
+                    newsItems.itemCount > 0
+        },
         onRefresh = {
-            newsItems.refresh()
-            viewModel.getHeadlineNews()
+            if (isSearchActive) {
+                searchItems.refresh()
+            } else {
+                newsItems.refresh()
+                viewModel.getHeadlineNews()
+            }
         },
         modifier = Modifier.fillMaxSize()
     ) {
@@ -70,161 +98,318 @@ fun HomeScreen(
             item {
                 HeaderSection()
 
-                Spacer(modifier = Modifier.height(28.dp))
-
-                GreetingSection()
-
                 Spacer(modifier = Modifier.height(24.dp))
-            }
 
-            item {
-                Text(
-                    text = "Today's Headline",
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold
+                SearchBar(
+                    query = searchUiState.query,
+                    onQueryChange = searchViewModel::onQueryChange,
+                    onSearch = {
+                        searchViewModel.searchNews()
+                        isSearchActive = searchUiState.query.isNotBlank()
+                    },
+                    onClear = {
+                        searchViewModel.onQueryChange("")
+                        searchViewModel.searchNews()
+                        isSearchActive = false
+                    }
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(28.dp))
+
+                if (!isSearchActive) {
+                    GreetingSection()
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
             }
 
-            item {
-                when {
-                    uiState.isLoading -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator()
-                        }
-                    }
+            if (isSearchActive) {
 
-                    uiState.error != null -> {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = uiState.error ?: "Something went wrong"
-                            )
+                // SEARCH RESULTS
+                item {
+                    Text(
+                        text = "Search Results",
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.Bold
+                    )
 
-                            Button(onClick = viewModel::getHeadlineNews) {
-                                Text("Try Again")
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                when (val refreshState = searchItems.loadState.refresh) {
+                    is LoadState.Loading -> {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(160.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
                             }
                         }
                     }
 
-                    uiState.headlines.isEmpty() -> {
-                        Text("No headline available")
+                    is LoadState.Error -> {
+                        item {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = refreshState.error.localizedMessage
+                                        ?: "Failed to search news"
+                                )
+
+                                Button(onClick = { searchItems.retry() }) {
+                                    Text("Try Again")
+                                }
+                            }
+                        }
                     }
 
-                    else -> {
-                        HeadlineCard(
-                            news = uiState.headlines.first(),
+                    is LoadState.NotLoading -> {
+                        if (searchItems.itemCount == 0) {
+                            item {
+                                Text("No news found")
+                            }
+                        }
+                    }
+                }
+
+                items(searchItems.itemCount) { index ->
+                    val article = searchItems[index]
+
+                    if (article != null) {
+                        NewsItem(
+                            news = article,
                             onClick = onNewsClick
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(28.dp))
-
-                Text(
-                    text = "Latest News",
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            when (val refreshState = newsItems.loadState.refresh) {
-                is LoadState.Loading -> {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(160.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator()
-                        }
-                    }
-                }
-
-                is LoadState.Error -> {
-                    item {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = refreshState.error.localizedMessage
-                                    ?: "Failed to load news"
-                            )
-
-                            Button(onClick = { newsItems.retry() }) {
-                                Text("Try Again")
+                when (searchItems.loadState.append) {
+                    is LoadState.Loading -> {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
                             }
                         }
                     }
-                }
 
-                is LoadState.NotLoading -> {
-                    if (newsItems.itemCount == 0) {
+                    is LoadState.Error -> {
                         item {
-                            Text("No news available")
-                        }
-                    }
-                }
-            }
-
-            items(
-                count = newsItems.itemCount
-            ) { index ->
-                val article = newsItems[index]
-
-                if (article != null) {
-                    NewsItem(
-                        news = article,
-                        onClick = onNewsClick
-                    )
-                }
-            }
-
-            when (newsItems.loadState.append) {
-                is LoadState.Loading -> {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator()
-                        }
-                    }
-                }
-
-                is LoadState.Error -> {
-                    item {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text("Failed to load more news")
-
-                            Button(onClick = { newsItems.retry() }) {
+                            Button(
+                                onClick = { searchItems.retry() }
+                            ) {
                                 Text("Retry")
                             }
                         }
                     }
+
+                    is LoadState.NotLoading -> Unit
                 }
 
-                is LoadState.NotLoading -> Unit
+            } else {
+
+                // HOME CONTENT
+
+                item {
+                    Text(
+                        text = "Today's Headline",
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                item {
+                    when {
+                        uiState.isLoading -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
+                            }
+                        }
+
+                        uiState.error != null -> {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = uiState.error ?: "Something went wrong"
+                                )
+
+                                Button(onClick = viewModel::getHeadlineNews) {
+                                    Text("Try Again")
+                                }
+                            }
+                        }
+
+                        uiState.headlines.isEmpty() -> {
+                            Text("No headline available")
+                        }
+
+                        else -> {
+                            HeadlineCard(
+                                news = uiState.headlines.first(),
+                                onClick = onNewsClick
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(28.dp))
+
+                    Text(
+                        text = "Latest News",
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                when (val refreshState = newsItems.loadState.refresh) {
+                    is LoadState.Loading -> {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(160.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                    }
+
+                    is LoadState.Error -> {
+                        item {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = refreshState.error.localizedMessage
+                                        ?: "Failed to load news"
+                                )
+
+                                Button(onClick = { newsItems.retry() }) {
+                                    Text("Try Again")
+                                }
+                            }
+                        }
+                    }
+
+                    is LoadState.NotLoading -> {
+                        if (newsItems.itemCount == 0) {
+                            item {
+                                Text("No news available")
+                            }
+                        }
+                    }
+                }
+
+                items(newsItems.itemCount) { index ->
+                    val article = newsItems[index]
+
+                    if (article != null) {
+                        NewsItem(
+                            news = article,
+                            onClick = onNewsClick
+                        )
+                    }
+                }
+
+                when (newsItems.loadState.append) {
+                    is LoadState.Loading -> {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                    }
+
+                    is LoadState.Error -> {
+                        item {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("Failed to load more news")
+
+                                Button(onClick = { newsItems.retry() }) {
+                                    Text("Retry")
+                                }
+                            }
+                        }
+                    }
+
+                    is LoadState.NotLoading -> Unit
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun SearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    onClear: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.weight(1f),
+            placeholder = {
+                Text("Search news...")
+            },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                imeAction = ImeAction.Search
+            ),
+            keyboardActions = KeyboardActions(
+                onSearch = { onSearch() }
+            ),
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = onClear) {
+                        Text("×", fontSize = 20.sp)
+                    }
+                }
+            },
+            shape = RoundedCornerShape(14.dp)
+        )
+
+        Button(
+            onClick = onSearch,
+            enabled = query.isNotBlank()
+        ) {
+            Text("Search")
         }
     }
 }

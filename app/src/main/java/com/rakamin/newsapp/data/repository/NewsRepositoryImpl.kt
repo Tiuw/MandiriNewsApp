@@ -1,17 +1,19 @@
+
 package com.rakamin.newsapp.data.repository
 
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
-import com.rakamin.newsapp.data.remote.paging.NewsPagingSource
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import com.rakamin.newsapp.BuildConfig
 import com.rakamin.newsapp.data.mapper.toDomain
 import com.rakamin.newsapp.data.remote.api.NewsApiService
+import com.rakamin.newsapp.data.remote.paging.NewsPagingSource
+import com.rakamin.newsapp.data.remote.paging.SearchNewsPagingSource
 import com.rakamin.newsapp.domain.model.News
 import com.rakamin.newsapp.domain.repository.NewsRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlin.coroutines.cancellation.CancellationException
 
 class NewsRepositoryImpl(
@@ -50,6 +52,28 @@ class NewsRepositoryImpl(
             ),
             pagingSourceFactory = {
                 NewsPagingSource(newsApiService)
+            }
+        ).flow.map { pagingData ->
+            pagingData.map { article ->
+                article.toDomain()
+            }
+        }
+    }
+
+    override fun searchNews(
+        query: String
+    ): Flow<PagingData<News>> {
+        return Pager(
+            config = PagingConfig(
+                pageSize = 20,
+                initialLoadSize = 20,
+                enablePlaceholders = false
+            ),
+            pagingSourceFactory = {
+                SearchNewsPagingSource(
+                    newsApiService = newsApiService,
+                    query = query.trim()
+                )
             }
         ).flow.map { pagingData ->
             pagingData.map { article ->
