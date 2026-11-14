@@ -1,4 +1,3 @@
-
 package com.rakamin.newsapp.ui.home
 
 import androidx.compose.foundation.background
@@ -35,8 +34,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
-import coil3.compose.AsyncImage
 import com.rakamin.newsapp.domain.model.News
+import com.rakamin.newsapp.ui.components.NewsImage
+import com.rakamin.newsapp.ui.util.toFormattedDate
 
 @Composable
 fun HomeScreen(
@@ -290,16 +290,12 @@ private fun HeadlineCard(
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            AsyncImage(
-                model = news.imageUrl,
+            NewsImage(
+                imageUrl = news.imageUrl,
                 contentDescription = news.title,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(180.dp)
-                    .background(
-                        MaterialTheme.colorScheme.primaryContainer,
-                        RoundedCornerShape(14.dp)
-                    )
             )
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -343,15 +339,11 @@ private fun NewsItem(
             modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = news.imageUrl,
+            NewsImage(
+                imageUrl = news.imageUrl,
                 contentDescription = news.title,
                 modifier = Modifier
                     .size(88.dp)
-                    .background(
-                        MaterialTheme.colorScheme.secondaryContainer,
-                        RoundedCornerShape(12.dp)
-                    )
             )
 
             Spacer(modifier = Modifier.width(14.dp))
@@ -376,7 +368,7 @@ private fun NewsItem(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = news.publishedAt ?: "",
+                    text = news.publishedAt.toFormattedDate(),
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

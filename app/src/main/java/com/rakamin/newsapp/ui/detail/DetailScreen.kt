@@ -20,8 +20,9 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.rakamin.newsapp.domain.model.News
+import com.rakamin.newsapp.ui.components.NewsImage
+import com.rakamin.newsapp.ui.util.toFormattedDate
 
 @Composable
 fun DetailScreen(
@@ -45,13 +46,12 @@ fun DetailScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        AsyncImage(
-            model = news.imageUrl,
+        NewsImage(
+            imageUrl = news.imageUrl,
             contentDescription = news.title,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(240.dp)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
         )
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -81,7 +81,7 @@ fun DetailScreen(
         Spacer(modifier = Modifier.height(6.dp))
 
         Text(
-            text = news.publishedAt ?: "",
+            text = news.publishedAt.toFormattedDate(),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
