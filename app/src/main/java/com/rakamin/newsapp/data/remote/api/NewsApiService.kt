@@ -13,4 +13,14 @@ interface NewsApiService {
         @Query("pageSize") pageSize: Int = 20,
         @Query("apiKey") apiKey: String
     ): NewsResponse
+
+    @GET("v2/everything")
+    suspend fun searchNews(
+        @Query("q") query: String,
+        @Query("page") page: Int = 1,
+        @Query("pageSize") pageSize: Int = 20,
+        @Query("sortBy") sortBy: String = "publishedAt",
+        @Query("apiKey") apiKey: String
+    ): NewsResponse
 }
+
