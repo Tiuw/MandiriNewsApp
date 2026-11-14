@@ -20,9 +20,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,6 +40,8 @@ import com.rakamin.newsapp.domain.model.News
 import com.rakamin.newsapp.ui.components.NewsImage
 import com.rakamin.newsapp.ui.util.toFormattedDate
 
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onNewsClick: (News) -> Unit,
@@ -48,169 +52,179 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val newsItems = viewModel.newsPagingFlow.collectAsLazyPagingItems()
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        contentPadding = PaddingValues(20.dp)
+    PullToRefreshBox(
+        isRefreshing = newsItems.loadState.refresh is LoadState.Loading &&
+                newsItems.itemCount > 0,
+        onRefresh = {
+            newsItems.refresh()
+            viewModel.getHeadlineNews()
+        },
+        modifier = Modifier.fillMaxSize()
     ) {
-        item {
-            HeaderSection()
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            contentPadding = PaddingValues(20.dp)
+        ) {
+            item {
+                HeaderSection()
 
-            Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(28.dp))
 
-            GreetingSection()
+                GreetingSection()
 
-            Spacer(modifier = Modifier.height(24.dp))
-        }
+                Spacer(modifier = Modifier.height(24.dp))
+            }
 
-        item {
-            Text(
-                text = "Today's Headline",
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Bold
-            )
+            item {
+                Text(
+                    text = "Today's Headline",
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold
+                )
 
-            Spacer(modifier = Modifier.height(12.dp))
-        }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
 
-        item {
-            when {
-                uiState.isLoading -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
+            item {
+                when {
+                    uiState.isLoading -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+
+                    uiState.error != null -> {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = uiState.error ?: "Something went wrong"
+                            )
+
+                            Button(onClick = viewModel::getHeadlineNews) {
+                                Text("Try Again")
+                            }
+                        }
+                    }
+
+                    uiState.headlines.isEmpty() -> {
+                        Text("No headline available")
+                    }
+
+                    else -> {
+                        HeadlineCard(
+                            news = uiState.headlines.first(),
+                            onClick = onNewsClick
+                        )
                     }
                 }
 
-                uiState.error != null -> {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = uiState.error ?: "Something went wrong"
-                        )
+                Spacer(modifier = Modifier.height(28.dp))
 
-                        Button(onClick = viewModel::getHeadlineNews) {
-                            Text("Try Again")
+                Text(
+                    text = "Latest News",
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            when (val refreshState = newsItems.loadState.refresh) {
+                is LoadState.Loading -> {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
                         }
                     }
                 }
 
-                uiState.headlines.isEmpty() -> {
-                    Text("No headline available")
+                is LoadState.Error -> {
+                    item {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = refreshState.error.localizedMessage
+                                    ?: "Failed to load news"
+                            )
+
+                            Button(onClick = { newsItems.retry() }) {
+                                Text("Try Again")
+                            }
+                        }
+                    }
                 }
 
-                else -> {
-                    HeadlineCard(
-                        news = uiState.headlines.first(),
+                is LoadState.NotLoading -> {
+                    if (newsItems.itemCount == 0) {
+                        item {
+                            Text("No news available")
+                        }
+                    }
+                }
+            }
+
+            items(
+                count = newsItems.itemCount
+            ) { index ->
+                val article = newsItems[index]
+
+                if (article != null) {
+                    NewsItem(
+                        news = article,
                         onClick = onNewsClick
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
-
-            Text(
-                text = "Latest News",
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        when (val refreshState = newsItems.loadState.refresh) {
-            is LoadState.Loading -> {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(160.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                }
-            }
-
-            is LoadState.Error -> {
-                item {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = refreshState.error.localizedMessage
-                                ?: "Failed to load news"
-                        )
-
-                        Button(onClick = { newsItems.retry() }) {
-                            Text("Try Again")
-                        }
-                    }
-                }
-            }
-
-            is LoadState.NotLoading -> {
-                if (newsItems.itemCount == 0) {
+            when (newsItems.loadState.append) {
+                is LoadState.Loading -> {
                     item {
-                        Text("No news available")
-                    }
-                }
-            }
-        }
-
-        items(
-            count = newsItems.itemCount
-        ) { index ->
-            val article = newsItems[index]
-
-            if (article != null) {
-                NewsItem(
-                    news = article,
-                    onClick = onNewsClick
-                )
-            }
-        }
-
-        when (newsItems.loadState.append) {
-            is LoadState.Loading -> {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                }
-            }
-
-            is LoadState.Error -> {
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text("Failed to load more news")
-
-                        Button(onClick = { newsItems.retry() }) {
-                            Text("Retry")
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
                         }
                     }
                 }
-            }
 
-            is LoadState.NotLoading -> Unit
+                is LoadState.Error -> {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text("Failed to load more news")
+
+                            Button(onClick = { newsItems.retry() }) {
+                                Text("Retry")
+                            }
+                        }
+                    }
+                }
+
+                is LoadState.NotLoading -> Unit
+            }
         }
     }
 }
