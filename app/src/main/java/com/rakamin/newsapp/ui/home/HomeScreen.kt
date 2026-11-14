@@ -1,4 +1,3 @@
-
 package com.rakamin.newsapp.ui.home
 
 import androidx.compose.foundation.background
@@ -16,20 +15,33 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
+import com.rakamin.newsapp.domain.model.News
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    viewModel: HomeViewModel = viewModel(
+        factory = HomeViewModelFactory()
+    )
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -45,11 +57,41 @@ fun HomeScreen() {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        HeadlineSection()
+        when {
+            uiState.isLoading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
 
-        Spacer(modifier = Modifier.height(28.dp))
+            uiState.error != null -> {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = uiState.error ?: "Something went wrong"
+                    )
 
-        LatestNewsSection()
+                    Button(onClick = viewModel::getHeadlineNews) {
+                        Text("Try Again")
+                    }
+                }
+            }
+
+            uiState.headlines.isEmpty() -> {
+                Text("No news available")
+            }
+
+            else -> {
+                NewsContent(news = uiState.headlines)
+            }
+        }
     }
 }
 
@@ -72,8 +114,7 @@ private fun HeaderSection() {
             Text(
                 text = "NEWS",
                 fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onBackground
+                fontWeight = FontWeight.ExtraBold
             )
         }
 
@@ -99,8 +140,7 @@ private fun GreetingSection() {
         Text(
             text = "Good morning!",
             fontSize = 26.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
+            fontWeight = FontWeight.Bold
         )
 
         Spacer(modifier = Modifier.height(4.dp))
@@ -114,114 +154,80 @@ private fun GreetingSection() {
 }
 
 @Composable
-private fun HeadlineSection() {
+private fun NewsContent(news: List<News>) {
     Column {
-        SectionTitle(title = "Today's Headline")
+        Text(
+            text = "Today's Headline",
+            fontSize = 19.sp,
+            fontWeight = FontWeight.Bold
+        )
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = RoundedCornerShape(14.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "FEATURED NEWS",
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp
-                    )
-                }
+        news.firstOrNull()?.let { headline ->
+            HeadlineCard(news = headline)
+        }
 
-                Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(28.dp))
 
-                Text(
-                    text = "Business & Economy",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
-                )
+        Text(
+            text = "Latest News",
+            fontSize = 19.sp,
+            fontWeight = FontWeight.Bold
+        )
 
-                Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-                Text(
-                    text = "The Latest Developments in Indonesia's Economy",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    lineHeight = 28.sp
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Read more →",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-            }
+        news.drop(1).forEach { article ->
+            NewsItem(news = article)
         }
     }
 }
 
 @Composable
-private fun LatestNewsSection() {
-    Column {
-        SectionTitle(title = "Latest News")
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        NewsItem(
-            category = "Business",
-            title = "Indonesia's Digital Banking Industry Continues to Grow",
-            time = "10 minutes ago"
+private fun HeadlineCard(news: News) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primary
         )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            AsyncImage(
+                model = news.imageUrl,
+                contentDescription = news.title,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        RoundedCornerShape(14.dp)
+                    )
+            )
 
-        NewsItem(
-            category = "Technology",
-            title = "How Technology Is Transforming Financial Services",
-            time = "30 minutes ago"
-        )
+            Spacer(modifier = Modifier.height(14.dp))
 
-        NewsItem(
-            category = "Economy",
-            title = "Market Updates: What Investors Need to Know",
-            time = "1 hour ago"
-        )
+            Text(
+                text = news.sourceName ?: "News",
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                fontSize = 12.sp
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = news.title ?: "Untitled article",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimary
+            )
+        }
     }
 }
 
 @Composable
-private fun SectionTitle(title: String) {
-    Text(
-        text = title,
-        fontSize = 19.sp,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onBackground
-    )
-}
-
-@Composable
-private fun NewsItem(
-    category: String,
-    title: String,
-    time: String
-) {
+private fun NewsItem(news: News) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -229,39 +235,28 @@ private fun NewsItem(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 1.dp
         )
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
+            AsyncImage(
+                model = news.imageUrl,
+                contentDescription = news.title,
                 modifier = Modifier
                     .size(88.dp)
                     .background(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        shape = RoundedCornerShape(12.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "NEWS",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            }
+                        MaterialTheme.colorScheme.secondaryContainer,
+                        RoundedCornerShape(12.dp)
+                    )
+            )
 
             Spacer(modifier = Modifier.width(14.dp))
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = category.uppercase(),
+                    text = news.sourceName ?: "News",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
@@ -270,17 +265,16 @@ private fun NewsItem(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = title,
+                    text = news.title ?: "Untitled article",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
                     lineHeight = 20.sp
                 )
 
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = time,
+                    text = news.publishedAt ?: "",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
