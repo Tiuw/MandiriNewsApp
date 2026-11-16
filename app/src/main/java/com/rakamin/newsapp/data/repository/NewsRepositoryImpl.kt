@@ -66,7 +66,12 @@ class NewsRepositoryImpl(
     }
 
     override fun searchNews(
-        query: String
+        query: String,
+        from: String?,
+        to: String?,
+        sortBy: String,
+        sources: String?,
+        domains: String?
     ): Flow<PagingData<News>> {
         return Pager(
             config = PagingConfig(
@@ -77,7 +82,12 @@ class NewsRepositoryImpl(
             pagingSourceFactory = {
                 SearchNewsPagingSource(
                     newsApiService = newsApiService,
-                    query = query.trim()
+                    query = query.trim(),
+                    from = from,
+                    to = to,
+                    sortBy = sortBy,
+                    sources = sources,
+                    domains = domains
                 )
             }
         ).flow.map { pagingData ->
