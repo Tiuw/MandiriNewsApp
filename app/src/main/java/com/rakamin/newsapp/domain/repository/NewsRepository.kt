@@ -12,7 +12,7 @@ interface NewsRepository {
         pageSize: Int = 20
     ): Result<List<News>>
 
-    fun getNews(): Flow<PagingData<News>>
+    fun getNews(category: String? = null): Flow<PagingData<News>>
 
     fun searchNews(
         query: String
