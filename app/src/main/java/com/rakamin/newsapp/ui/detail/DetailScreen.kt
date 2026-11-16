@@ -15,21 +15,36 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.rakamin.newsapp.domain.model.News
+import com.rakamin.newsapp.ui.bookmark.BookmarkViewModel
+import com.rakamin.newsapp.ui.bookmark.BookmarkViewModelFactory
 import com.rakamin.newsapp.ui.components.NewsImage
 import com.rakamin.newsapp.ui.util.toFormattedDate
 
 @Composable
 fun DetailScreen(
     news: News,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    bookmarkViewModel: BookmarkViewModel = viewModel(
+        factory = BookmarkViewModelFactory(LocalContext.current)
+    )
 ) {
     val uriHandler = LocalUriHandler.current
+
+    val bookmarkedNews by bookmarkViewModel.bookmarkedNews.collectAsState()
+
+    val isBookmarked = bookmarkedNews.any {
+        it.url == news.url
+    }
 
     Column(
         modifier = Modifier
@@ -85,6 +100,27 @@ fun DetailScreen(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedButton(
+            onClick = {
+                bookmarkViewModel.toggleBookmark(
+                    news = news,
+                    isBookmarked = isBookmarked
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !news.url.isNullOrBlank()
+        ) {
+            Text(
+                if (isBookmarked) {
+                    "✓ Saved"
+                } else {
+                    "Save Bookmark"
+                }
+            )
+        }
 
         Spacer(modifier = Modifier.height(20.dp))
 

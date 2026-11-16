@@ -1,4 +1,3 @@
-
 package com.rakamin.newsapp.ui.home
 
 import androidx.compose.foundation.background
@@ -29,8 +28,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -40,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -48,6 +48,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.rakamin.newsapp.domain.model.News
+import com.rakamin.newsapp.ui.bookmark.BookmarkViewModel
+import com.rakamin.newsapp.ui.bookmark.BookmarkViewModelFactory
 import com.rakamin.newsapp.ui.components.NewsImage
 import com.rakamin.newsapp.ui.search.SearchViewModel
 import com.rakamin.newsapp.ui.search.SearchViewModelFactory
@@ -57,16 +59,26 @@ import com.rakamin.newsapp.ui.util.toFormattedDate
 @Composable
 fun HomeScreen(
     onNewsClick: (News) -> Unit,
+    onSavedNewsClick: () -> Unit,
     viewModel: HomeViewModel = viewModel(
         factory = HomeViewModelFactory()
     ),
     searchViewModel: SearchViewModel = viewModel(
         factory = SearchViewModelFactory()
-    )
+    ),
+    bookmarkViewModel: BookmarkViewModel = viewModel(
+        factory = BookmarkViewModelFactory(LocalContext.current)
+    ),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val searchUiState by searchViewModel.uiState.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
+
+    val bookmarkedNews by bookmarkViewModel.bookmarkedNews.collectAsState()
+
+    val bookmarkedUrls = bookmarkedNews
+        .mapNotNull { it.url }
+        .toSet()
 
     val newsItems = viewModel.newsPagingFlow.collectAsLazyPagingItems()
     val searchItems = searchViewModel.searchResults.collectAsLazyPagingItems()
@@ -98,7 +110,9 @@ fun HomeScreen(
             contentPadding = PaddingValues(20.dp)
         ) {
             item {
-                HeaderSection()
+                HeaderSection(
+                    onSavedNewsClick = onSavedNewsClick
+                )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -184,7 +198,14 @@ fun HomeScreen(
                     if (article != null) {
                         NewsItem(
                             news = article,
-                            onClick = onNewsClick
+                            onClick = onNewsClick,
+                            isBookmarked = article.url in bookmarkedUrls,
+                            onBookmarkClick = {
+                                bookmarkViewModel.toggleBookmark(
+                                    article,
+                                    article.url in bookmarkedUrls
+                                )
+                            }
                         )
                     }
                 }
@@ -265,7 +286,14 @@ fun HomeScreen(
                         else -> {
                             HeadlineCard(
                                 news = uiState.headlines.first(),
-                                onClick = onNewsClick
+                                onClick = onNewsClick,
+                                isBookmarked = uiState.headlines.first().url in bookmarkedUrls,
+                                onBookmarkClick = {
+                                    bookmarkViewModel.toggleBookmark(
+                                        uiState.headlines.first(),
+                                        uiState.headlines.first().url in bookmarkedUrls
+                                    )
+                                }
                             )
                         }
                     }
@@ -336,7 +364,14 @@ fun HomeScreen(
                     if (article != null) {
                         NewsItem(
                             news = article,
-                            onClick = onNewsClick
+                            onClick = onNewsClick,
+                            isBookmarked = article.url in bookmarkedUrls,
+                            onBookmarkClick = {
+                                bookmarkViewModel.toggleBookmark(
+                                    article,
+                                    article.url in bookmarkedUrls
+                                )
+                            }
                         )
                     }
                 }
@@ -469,7 +504,9 @@ private fun SearchBar(
 }
 
 @Composable
-private fun HeaderSection() {
+private fun HeaderSection(
+    onSavedNewsClick: () -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -491,21 +528,14 @@ private fun HeaderSection() {
             )
         }
 
-        Surface(
-            shape = RoundedCornerShape(50),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.size(44.dp)
+        Button(
+            onClick = onSavedNewsClick
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(
-                    text = "N",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
+            Text("Saved")
         }
     }
 }
+
 
 @Composable
 private fun GreetingSection() {
@@ -529,7 +559,9 @@ private fun GreetingSection() {
 @Composable
 private fun HeadlineCard(
     news: News,
-    onClick: (News) -> Unit
+    onClick: (News) -> Unit,
+    isBookmarked: Boolean,
+    onBookmarkClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -559,6 +591,12 @@ private fun HeadlineCard(
                 fontSize = 12.sp
             )
 
+            Button(
+                onClick = onBookmarkClick
+            ) {
+                Text(if (isBookmarked) "Saved" else "Save")
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
@@ -574,7 +612,9 @@ private fun HeadlineCard(
 @Composable
 private fun NewsItem(
     news: News,
-    onClick: (News) -> Unit
+    onClick: (News) -> Unit,
+    isBookmarked: Boolean,
+    onBookmarkClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -597,6 +637,12 @@ private fun NewsItem(
                 contentDescription = news.title,
                 modifier = Modifier.size(88.dp)
             )
+
+            TextButton(
+                onClick = onBookmarkClick
+            ) {
+                Text(if (isBookmarked) "Saved" else "Save")
+            }
 
             Spacer(modifier = Modifier.width(14.dp))
 
