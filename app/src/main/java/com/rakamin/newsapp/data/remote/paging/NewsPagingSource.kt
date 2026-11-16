@@ -8,7 +8,8 @@ import com.rakamin.newsapp.data.remote.response.ArticleResponse
 import kotlinx.coroutines.CancellationException
 
 class NewsPagingSource(
-    private val newsApiService: NewsApiService
+    private val newsApiService: NewsApiService,
+    private val category: String? = null
 ) : PagingSource<Int, ArticleResponse>() {
 
     override fun getRefreshKey(
@@ -29,6 +30,7 @@ class NewsPagingSource(
 
             val response = newsApiService.getTopHeadlines(
                 country = "us",
+                category = category,
                 page = page,
                 pageSize = pageSize,
                 apiKey = com.rakamin.newsapp.BuildConfig.NEWS_API_KEY

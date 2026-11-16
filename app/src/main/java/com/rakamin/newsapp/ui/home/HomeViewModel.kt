@@ -1,3 +1,4 @@
+
 package com.rakamin.newsapp.ui.home
 
 import androidx.lifecycle.ViewModel
@@ -7,12 +8,15 @@ import com.rakamin.newsapp.di.RepositoryModule
 import com.rakamin.newsapp.domain.usecase.GetHeadlineNewsUseCase
 import com.rakamin.newsapp.domain.usecase.GetNewsUseCase
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModel(
     private val getHeadlineNewsUseCase: GetHeadlineNewsUseCase,
     private val getNewsUseCase: GetNewsUseCase
@@ -21,11 +25,21 @@ class HomeViewModel(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    val newsPagingFlow = getNewsUseCase()
+    private val _selectedCategory = MutableStateFlow<String?>(null)
+    val selectedCategory: StateFlow<String?> = _selectedCategory.asStateFlow()
+
+    val newsPagingFlow = _selectedCategory
+        .flatMapLatest { category ->
+            getNewsUseCase(category)
+        }
         .cachedIn(viewModelScope)
 
     init {
         getHeadlineNews()
+    }
+
+    fun onCategorySelected(category: String?) {
+        _selectedCategory.value = category
     }
 
     fun getHeadlineNews() {

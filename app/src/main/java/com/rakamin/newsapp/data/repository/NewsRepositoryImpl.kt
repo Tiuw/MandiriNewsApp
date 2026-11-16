@@ -43,7 +43,9 @@ class NewsRepositoryImpl(
         }
     }
 
-    override fun getNews(): Flow<PagingData<News>> {
+    override fun getNews(
+        category: String?
+    ): Flow<PagingData<News>> {
         return Pager(
             config = PagingConfig(
                 pageSize = 20,
@@ -51,7 +53,10 @@ class NewsRepositoryImpl(
                 enablePlaceholders = false
             ),
             pagingSourceFactory = {
-                NewsPagingSource(newsApiService)
+                NewsPagingSource(
+                    newsApiService = newsApiService,
+                    category = category
+                )
             }
         ).flow.map { pagingData ->
             pagingData.map { article ->
