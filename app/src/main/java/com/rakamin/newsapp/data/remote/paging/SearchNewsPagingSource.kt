@@ -10,7 +10,12 @@ import kotlinx.coroutines.CancellationException
 
 class SearchNewsPagingSource(
     private val newsApiService: NewsApiService,
-    private val query: String
+    private val query: String,
+    private val from: String? = null,
+    private val to: String? = null,
+    private val sortBy: String = "publishedAt",
+    private val sources: String? = null,
+    private val domains: String? = null
 ) : PagingSource<Int, ArticleResponse>() {
 
     override fun getRefreshKey(
@@ -33,7 +38,12 @@ class SearchNewsPagingSource(
                 query = query,
                 page = page,
                 pageSize = pageSize,
-                apiKey = BuildConfig.NEWS_API_KEY
+                sortBy = sortBy,
+                apiKey = BuildConfig.NEWS_API_KEY,
+                from = from,
+                to = to,
+                sources = sources,
+                domains = domains
             )
 
             LoadResult.Page(

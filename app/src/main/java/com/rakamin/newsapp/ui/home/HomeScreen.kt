@@ -1,3 +1,4 @@
+
 package com.rakamin.newsapp.ui.home
 
 import androidx.compose.foundation.background
@@ -51,6 +52,7 @@ import com.rakamin.newsapp.domain.model.News
 import com.rakamin.newsapp.ui.bookmark.BookmarkViewModel
 import com.rakamin.newsapp.ui.bookmark.BookmarkViewModelFactory
 import com.rakamin.newsapp.ui.components.NewsImage
+import com.rakamin.newsapp.ui.search.AdvancedSearchFilters
 import com.rakamin.newsapp.ui.search.SearchViewModel
 import com.rakamin.newsapp.ui.search.SearchViewModelFactory
 import com.rakamin.newsapp.ui.util.toFormattedDate
@@ -109,6 +111,8 @@ fun HomeScreen(
                 .background(MaterialTheme.colorScheme.background),
             contentPadding = PaddingValues(20.dp)
         ) {
+
+            // HEADER AND SEARCH BAR
             item {
                 HeaderSection(
                     onSavedNewsClick = onSavedNewsClick
@@ -129,11 +133,38 @@ fun HomeScreen(
                         isSearchActive = false
                     }
                 )
+            }
 
-                Spacer(modifier = Modifier.height(28.dp))
+            // ADVANCED SEARCH FILTERS
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
 
-                if (!isSearchActive) {
+                AdvancedSearchFilters(
+                    state = searchUiState,
+                    onFromDateChange = searchViewModel::onFromDateChange,
+                    onToDateChange = searchViewModel::onToDateChange,
+                    onSortByChange = searchViewModel::onSortByChange,
+                    onSourcesChange = searchViewModel::onSourcesChange,
+                    onDomainsChange = searchViewModel::onDomainsChange,
+                    onApply = {
+                        if (searchUiState.query.isNotBlank()) {
+                            searchViewModel.searchNews()
+                            isSearchActive = true
+                        }
+                    },
+                    onReset = {
+                        searchViewModel.clearFilters()
+                    }
+                )
+            }
+
+            // GREETING
+            if (!isSearchActive) {
+                item {
+                    Spacer(modifier = Modifier.height(28.dp))
+
                     GreetingSection()
+
                     Spacer(modifier = Modifier.height(24.dp))
                 }
             }
@@ -176,7 +207,9 @@ fun HomeScreen(
                                         ?: "Failed to search news"
                                 )
 
-                                Button(onClick = { searchItems.retry() }) {
+                                Button(
+                                    onClick = { searchItems.retry() }
+                                ) {
                                     Text("Try Again")
                                 }
                             }
@@ -270,10 +303,13 @@ fun HomeScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Text(
-                                    text = uiState.error ?: "Something went wrong"
+                                    text = uiState.error
+                                        ?: "Something went wrong"
                                 )
 
-                                Button(onClick = viewModel::getHeadlineNews) {
+                                Button(
+                                    onClick = viewModel::getHeadlineNews
+                                ) {
                                     Text("Try Again")
                                 }
                             }
@@ -342,7 +378,9 @@ fun HomeScreen(
                                         ?: "Failed to load news"
                                 )
 
-                                Button(onClick = { newsItems.retry() }) {
+                                Button(
+                                    onClick = { newsItems.retry() }
+                                ) {
                                     Text("Try Again")
                                 }
                             }
@@ -400,7 +438,9 @@ fun HomeScreen(
                             ) {
                                 Text("Failed to load more news")
 
-                                Button(onClick = { newsItems.retry() }) {
+                                Button(
+                                    onClick = { newsItems.retry() }
+                                ) {
                                     Text("Retry")
                                 }
                             }
@@ -536,7 +576,6 @@ private fun HeaderSection(
     }
 }
 
-
 @Composable
 private fun GreetingSection() {
     Column {
@@ -574,7 +613,9 @@ private fun HeadlineCard(
             containerColor = MaterialTheme.colorScheme.primary
         )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
             NewsImage(
                 imageUrl = news.imageUrl,
                 contentDescription = news.title,
@@ -646,7 +687,9 @@ private fun NewsItem(
 
             Spacer(modifier = Modifier.width(14.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
                 Text(
                     text = news.sourceName ?: "News",
                     fontSize = 10.sp,

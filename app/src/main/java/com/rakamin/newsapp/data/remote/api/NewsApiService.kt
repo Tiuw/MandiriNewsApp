@@ -21,7 +21,10 @@ interface NewsApiService {
         @Query("page") page: Int = 1,
         @Query("pageSize") pageSize: Int = 20,
         @Query("sortBy") sortBy: String = "publishedAt",
-        @Query("apiKey") apiKey: String
+        @Query("apiKey") apiKey: String,
+        @Query("from") from: String? = null,
+        @Query("to") to: String? = null,
+        @Query("sources") sources: String? = null,
+        @Query("domains") domains: String? = null
     ): NewsResponse
 }
-
