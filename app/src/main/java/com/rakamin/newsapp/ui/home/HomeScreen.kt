@@ -1,7 +1,10 @@
 package com.rakamin.newsapp.ui.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,33 +18,37 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -50,306 +57,164 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.rakamin.newsapp.domain.model.News
 import com.rakamin.newsapp.ui.bookmark.BookmarkViewModel
 import com.rakamin.newsapp.ui.bookmark.BookmarkViewModelFactory
+import com.rakamin.newsapp.ui.components.AppBottomNavigation
 import com.rakamin.newsapp.ui.components.NewsImage
-import com.rakamin.newsapp.ui.search.AdvancedSearchFilters
-import com.rakamin.newsapp.ui.search.SearchViewModel
-import com.rakamin.newsapp.ui.search.SearchViewModelFactory
+import com.rakamin.newsapp.ui.theme.MandiriBlue
+import com.rakamin.newsapp.ui.theme.RadiantGold
 import com.rakamin.newsapp.ui.util.toFormattedDate
+
+private val MandiriNavyDark = Color(0xFF001838)
+private val MandiriGoldLight = Color(0xFFFFDE94)
+private val SurfaceColor = Color(0xFFF8FAFC)
+private val TextSecondary = Color(0xFF64748B)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onNewsClick: (News) -> Unit,
+    onSearchClick: () -> Unit,
     onSavedNewsClick: () -> Unit,
     viewModel: HomeViewModel = viewModel(
         factory = HomeViewModelFactory()
-    ),
-    searchViewModel: SearchViewModel = viewModel(
-        factory = SearchViewModelFactory()
     ),
     bookmarkViewModel: BookmarkViewModel = viewModel(
         factory = BookmarkViewModelFactory(LocalContext.current)
     ),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val searchUiState by searchViewModel.uiState.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
 
     val bookmarkedNews by bookmarkViewModel.bookmarkedNews.collectAsState()
-
-    val bookmarkedUrls = bookmarkedNews
-        .mapNotNull { it.url }
-        .toSet()
+    val bookmarkedUrls = bookmarkedNews.mapNotNull { it.url }.toSet()
 
     val newsItems = viewModel.newsPagingFlow.collectAsLazyPagingItems()
-    val searchItems = searchViewModel.searchResults.collectAsLazyPagingItems()
 
-    var isSearchActive by remember { mutableStateOf(false) }
+    val categories = listOf(
+        "Semua" to null,
+        "Bisnis & Finansial" to "business",
+        "Teknologi" to "technology",
+        "Sports" to "sports",
+        "Science" to "science",
+        "Entertainment" to "entertainment",
+        "Health" to "health"
+    )
 
-    PullToRefreshBox(
-        isRefreshing = if (isSearchActive) {
-            searchItems.loadState.refresh is LoadState.Loading &&
-                    searchItems.itemCount > 0
-        } else {
-            newsItems.loadState.refresh is LoadState.Loading &&
-                    newsItems.itemCount > 0
-        },
-        onRefresh = {
-            if (isSearchActive) {
-                searchItems.refresh()
-            } else {
+    Scaffold(
+        containerColor = SurfaceColor,
+        bottomBar = {
+            AppBottomNavigation(
+                currentRoute = "home",
+                onHomeClick = { },
+                onSearchClick = onSearchClick,
+                onSavedClick = onSavedNewsClick
+            )
+        }
+    ) { innerPadding ->
+        PullToRefreshBox(
+            isRefreshing = newsItems.loadState.refresh is LoadState.Loading && newsItems.itemCount > 0,
+            onRefresh = {
                 newsItems.refresh()
                 viewModel.getHeadlineNews()
-            }
-        },
-        modifier = Modifier.fillMaxSize()
-    ) {
-        LazyColumn(
+            },
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
-            contentPadding = PaddingValues(20.dp)
+                .padding(innerPadding)
         ) {
-
-            // HEADER AND SEARCH BAR
-            item {
-                HeaderSection(
-                    onSavedNewsClick = onSavedNewsClick
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                SearchBar(
-                    query = searchUiState.query,
-                    onQueryChange = searchViewModel::onQueryChange,
-                    onSearch = {
-                        searchViewModel.searchNews()
-                        isSearchActive = searchUiState.query.isNotBlank()
-                    },
-                    onClear = {
-                        searchViewModel.onQueryChange("")
-                        searchViewModel.searchNews()
-                        isSearchActive = false
-                    }
-                )
-            }
-
-            // ADVANCED SEARCH FILTERS
-            item {
-                Spacer(modifier = Modifier.height(12.dp))
-
-                AdvancedSearchFilters(
-                    state = searchUiState,
-                    onFromDateChange = searchViewModel::onFromDateChange,
-                    onToDateChange = searchViewModel::onToDateChange,
-                    onSortByChange = searchViewModel::onSortByChange,
-                    onSourcesChange = searchViewModel::onSourcesChange,
-                    onDomainsChange = searchViewModel::onDomainsChange,
-                    onApply = {
-                        if (searchUiState.query.isNotBlank()) {
-                            searchViewModel.searchNews()
-                            isSearchActive = true
-                        }
-                    },
-                    onReset = {
-                        searchViewModel.clearFilters()
-                    }
-                )
-            }
-
-            // GREETING
-            if (!isSearchActive) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(SurfaceColor),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 12.dp,
+                    bottom = 24.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 item {
-                    Spacer(modifier = Modifier.height(28.dp))
+                    HomeHeader()
+                }
 
+                item {
                     GreetingSection()
-
-                    Spacer(modifier = Modifier.height(24.dp))
                 }
-            }
 
-            if (isSearchActive) {
-
-                // SEARCH RESULTS
                 item {
-                    Text(
-                        text = "Search Results",
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.Bold
+                    SearchSection(
+                        onClick = onSearchClick
                     )
-
-                    Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                when (val refreshState = searchItems.loadState.refresh) {
-                    is LoadState.Loading -> {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(160.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator()
-                            }
-                        }
-                    }
-
-                    is LoadState.Error -> {
-                        item {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = refreshState.error.localizedMessage
-                                        ?: "Failed to search news"
-                                )
-
-                                Button(
-                                    onClick = { searchItems.retry() }
-                                ) {
-                                    Text("Try Again")
-                                }
-                            }
-                        }
-                    }
-
-                    is LoadState.NotLoading -> {
-                        if (searchItems.itemCount == 0) {
-                            item {
-                                Text("No news found")
-                            }
-                        }
-                    }
+                item {
+                    CategorySection(
+                        categories = categories,
+                        selectedCategory = selectedCategory,
+                        onCategorySelected = viewModel::onCategorySelected
+                    )
                 }
 
-                items(searchItems.itemCount) { index ->
-                    val article = searchItems[index]
-
-                    if (article != null) {
-                        NewsItem(
-                            news = article,
+                item {
+                    val headlineArticle = uiState.headlines.firstOrNull()
+                    if (uiState.isLoading) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(MandiriBlue.copy(alpha = 0.05f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = MandiriBlue)
+                        }
+                    } else if (headlineArticle != null) {
+                        FeaturedNewsCard(
+                            news = headlineArticle,
                             onClick = onNewsClick,
-                            isBookmarked = article.url in bookmarkedUrls,
+                            isBookmarked = headlineArticle.url in bookmarkedUrls,
                             onBookmarkClick = {
                                 bookmarkViewModel.toggleBookmark(
-                                    article,
-                                    article.url in bookmarkedUrls
+                                    headlineArticle,
+                                    headlineArticle.url in bookmarkedUrls
                                 )
                             }
                         )
                     }
                 }
 
-                when (searchItems.loadState.append) {
-                    is LoadState.Loading -> {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator()
-                            }
-                        }
-                    }
-
-                    is LoadState.Error -> {
-                        item {
-                            Button(
-                                onClick = { searchItems.retry() }
-                            ) {
-                                Text("Retry")
-                            }
-                        }
-                    }
-
-                    is LoadState.NotLoading -> Unit
-                }
-
-            } else {
-
-                // HOME CONTENT
-
                 item {
-                    Text(
-                        text = "Today's Headline",
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Berita Terkini",
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF0F172A)
+                            )
 
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
+                            Spacer(Modifier.width(8.dp))
 
-                item {
-                    when {
-                        uiState.isLoading -> {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(200.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator()
-                            }
-                        }
-
-                        uiState.error != null -> {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                            Surface(
+                                color = MandiriBlue.copy(alpha = 0.06f),
+                                shape = RoundedCornerShape(50)
                             ) {
                                 Text(
-                                    text = uiState.error
-                                        ?: "Something went wrong"
+                                    text = "● LIVE",
+                                    modifier = Modifier.padding(
+                                        horizontal = 8.dp,
+                                        vertical = 4.dp
+                                    ),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MandiriBlue
                                 )
-
-                                Button(
-                                    onClick = viewModel::getHeadlineNews
-                                ) {
-                                    Text("Try Again")
-                                }
                             }
                         }
-
-                        uiState.headlines.isEmpty() -> {
-                            Text("No headline available")
-                        }
-
-                        else -> {
-                            HeadlineCard(
-                                news = uiState.headlines.first(),
-                                onClick = onNewsClick,
-                                isBookmarked = uiState.headlines.first().url in bookmarkedUrls,
-                                onBookmarkClick = {
-                                    bookmarkViewModel.toggleBookmark(
-                                        uiState.headlines.first(),
-                                        uiState.headlines.first().url in bookmarkedUrls
-                                    )
-                                }
-                            )
-                        }
                     }
-
-                    Spacer(modifier = Modifier.height(28.dp))
-
-                    // CATEGORY SECTION
-                    CategorySection(
-                        selectedCategory = selectedCategory,
-                        onCategorySelected = viewModel::onCategorySelected
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    Text(
-                        text = "Latest News",
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
                 }
 
                 when (val refreshState = newsItems.loadState.refresh) {
@@ -361,7 +226,7 @@ fun HomeScreen(
                                     .height(160.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                CircularProgressIndicator()
+                                CircularProgressIndicator(color = MandiriBlue)
                             }
                         }
                     }
@@ -373,14 +238,16 @@ fun HomeScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Text(
-                                    text = refreshState.error.localizedMessage
-                                        ?: "Failed to load news"
+                                    text = refreshState.error.localizedMessage ?: "Gagal memuat berita",
+                                    fontSize = 12.sp,
+                                    color = TextSecondary
                                 )
-
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Button(
-                                    onClick = { newsItems.retry() }
+                                    onClick = { newsItems.retry() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = MandiriBlue)
                                 ) {
-                                    Text("Try Again")
+                                    Text("Coba Lagi")
                                 }
                             }
                         }
@@ -389,17 +256,23 @@ fun HomeScreen(
                     is LoadState.NotLoading -> {
                         if (newsItems.itemCount == 0) {
                             item {
-                                Text("No news available")
+                                Text(
+                                    text = "Tidak ada berita tersedia",
+                                    fontSize = 13.sp,
+                                    color = TextSecondary
+                                )
                             }
                         }
                     }
                 }
 
-                items(newsItems.itemCount) { index ->
+                items(
+                    count = newsItems.itemCount,
+                    key = { index -> newsItems[index]?.url ?: index }
+                ) { index ->
                     val article = newsItems[index]
-
                     if (article != null) {
-                        NewsItem(
+                        NewsCard(
                             news = article,
                             onClick = onNewsClick,
                             isBookmarked = article.url in bookmarkedUrls,
@@ -413,40 +286,27 @@ fun HomeScreen(
                     }
                 }
 
-                when (newsItems.loadState.append) {
-                    is LoadState.Loading -> {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator()
-                            }
-                        }
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = MandiriBlue,
+                            strokeWidth = 2.dp
+                        )
+
+                        Spacer(Modifier.height(8.dp))
+
+                        Text(
+                            text = "Sinkronisasi berita terkini...",
+                            fontSize = 11.sp,
+                            color = TextSecondary
+                        )
                     }
-
-                    is LoadState.Error -> {
-                        item {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text("Failed to load more news")
-
-                                Button(
-                                    onClick = { newsItems.retry() }
-                                ) {
-                                    Text("Retry")
-                                }
-                            }
-                        }
-                    }
-
-                    is LoadState.NotLoading -> Unit
                 }
             }
         }
@@ -454,123 +314,55 @@ fun HomeScreen(
 }
 
 @Composable
-private fun CategorySection(
-    selectedCategory: String?,
-    onCategorySelected: (String?) -> Unit
-) {
-    val categories = listOf(
-        "All" to null,
-        "Business" to "business",
-        "Technology" to "technology",
-        "Sports" to "sports",
-        "Science" to "science",
-        "Entertainment" to "entertainment",
-        "Health" to "health"
-    )
-
-    Column {
-        Text(
-            text = "Categories",
-            fontSize = 19.sp,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(categories.size) { index ->
-                val (label, category) = categories[index]
-
-                FilterChip(
-                    selected = selectedCategory == category,
-                    onClick = {
-                        onCategorySelected(category)
-                    },
-                    label = {
-                        Text(text = label)
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SearchBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onSearch: () -> Unit,
-    onClear: () -> Unit
-) {
+private fun HomeHeader() {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        OutlinedTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            modifier = Modifier.weight(1f),
-            placeholder = {
-                Text("Search news...")
-            },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                imeAction = ImeAction.Search
-            ),
-            keyboardActions = KeyboardActions(
-                onSearch = { onSearch() }
-            ),
-            trailingIcon = {
-                if (query.isNotEmpty()) {
-                    IconButton(onClick = onClear) {
-                        Text("×", fontSize = 20.sp)
-                    }
-                }
-            },
-            shape = RoundedCornerShape(14.dp)
-        )
-
-        Button(
-            onClick = onSearch,
-            enabled = query.isNotBlank()
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MandiriBlue),
+            contentAlignment = Alignment.Center
         ) {
-            Text("Search")
+            Text(
+                text = "m",
+                color = RadiantGold,
+                fontSize = 27.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
-    }
-}
 
-@Composable
-private fun HeaderSection(
-    onSavedNewsClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+        Spacer(Modifier.width(10.dp))
+
         Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Mandiri",
+                    color = MandiriBlue,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "News",
+                    color = Color(0xFF0F172A),
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(text = " •", color = RadiantGold)
+            }
+
             Text(
-                text = "MANDIRI",
-                fontSize = 13.sp,
+                text = "FINANCIAL & GLOBAL INSIGHTS",
+                color = Color(0xFF94A3B8),
+                fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                letterSpacing = 2.sp
+                letterSpacing = 1.sp
             )
-
-            Text(
-                text = "NEWS",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
-        }
-
-        Button(
-            onClick = onSavedNewsClick
-        ) {
-            Text("Saved")
         }
     }
 }
@@ -579,140 +371,340 @@ private fun HeaderSection(
 private fun GreetingSection() {
     Column {
         Text(
-            text = "Good morning!",
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Bold
+            text = "Selamat Datang",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF0F172A)
         )
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(Modifier.height(4.dp))
 
         Text(
-            text = "Stay informed with the latest updates.",
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = "Dapatkan informasi & berita terkini hari ini.",
+            fontSize = 12.sp,
+            color = TextSecondary
         )
     }
 }
 
 @Composable
-private fun HeadlineCard(
-    news: News,
-    onClick: (News) -> Unit,
-    isBookmarked: Boolean,
-    onBookmarkClick: () -> Unit
+private fun SearchSection(
+    onClick: () -> Unit
 ) {
-    Card(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable {
-                onClick(news)
-            },
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primary
-        )
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White)
+            .border(
+                1.dp,
+                Color(0xFFE2E8F0),
+                RoundedCornerShape(16.dp)
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            NewsImage(
-                imageUrl = news.imageUrl,
-                contentDescription = news.title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp)
-            )
+        Icon(
+            imageVector = Icons.Default.Search,
+            contentDescription = null,
+            tint = Color(0xFF94A3B8)
+        )
 
-            Spacer(modifier = Modifier.height(14.dp))
+        Spacer(Modifier.width(8.dp))
 
-            Text(
-                text = news.sourceName ?: "News",
-                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-                fontSize = 12.sp
-            )
+        Text(
+            text = "Cari berita terkini, pasar, emiten...",
+            fontSize = 12.sp,
+            color = Color(0xFF94A3B8),
+            modifier = Modifier.weight(1f)
+        )
 
-            Button(
-                onClick = onBookmarkClick
+        Icon(
+            imageVector = Icons.Default.Tune,
+            contentDescription = "Filter",
+            tint = MandiriBlue
+        )
+    }
+}
+
+@Composable
+private fun CategorySection(
+    categories: List<Pair<String, String?>>,
+    selectedCategory: String?,
+    onCategorySelected: (String?) -> Unit
+) {
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        categories.forEach { (label, category) ->
+            val selected = selectedCategory == category
+
+            Surface(
+                modifier = Modifier.clickable {
+                    onCategorySelected(category)
+                },
+                shape = RoundedCornerShape(50),
+                color = if (selected) MandiriBlue else Color.White,
+                border = if (selected) null else BorderStroke(
+                    1.dp,
+                    Color(0xFFE2E8F0)
+                )
             ) {
-                Text(if (isBookmarked) "Saved" else "Save")
+                Row(
+                    modifier = Modifier.padding(
+                        horizontal = 14.dp,
+                        vertical = 9.dp
+                    ),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (selected) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = RadiantGold,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(5.dp))
+                    }
+
+                    Text(
+                        text = label,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (selected) Color.White else Color(0xFF334155)
+                    )
+                }
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = news.title ?: "Untitled article",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimary
-            )
         }
     }
 }
 
 @Composable
-private fun NewsItem(
+private fun FeaturedNewsCard(
     news: News,
     onClick: (News) -> Unit,
     isBookmarked: Boolean,
     onBookmarkClick: () -> Unit
 ) {
-    Card(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp)
-            .clickable {
-                onClick(news)
-            },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+            .height(270.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(MandiriBlue)
+            .clickable { onClick(news) }
     ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            NewsImage(
-                imageUrl = news.imageUrl,
-                contentDescription = news.title,
-                modifier = Modifier.size(88.dp)
-            )
+        NewsImage(
+            imageUrl = news.imageUrl,
+            contentDescription = news.title,
+            modifier = Modifier.fillMaxSize()
+        )
 
-            TextButton(
-                onClick = onBookmarkClick
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.35f),
+                            Color.Transparent,
+                            MandiriBlue.copy(alpha = 0.98f)
+                        )
+                    )
+                )
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(if (isBookmarked) "Saved" else "Save")
+                Surface(
+                    color = RadiantGold,
+                    shape = RoundedCornerShape(50)
+                ) {
+                    Text(
+                        text = "● HEADLINE UTAMA",
+                        modifier = Modifier.padding(
+                            horizontal = 10.dp,
+                            vertical = 6.dp
+                        ),
+                        color = MandiriNavyDark,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+
+                IconButton(
+                    onClick = onBookmarkClick,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .background(
+                            Color.Black.copy(alpha = 0.35f),
+                            CircleShape
+                        )
+                ) {
+                    Icon(
+                        imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                        contentDescription = "Simpan berita",
+                        tint = if (isBookmarked) RadiantGold else Color.White
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.width(14.dp))
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = news.sourceName ?: "Headline",
+                        color = MandiriGoldLight,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "  •  ${news.publishedAt.toFormattedDate()}",
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 10.sp
+                    )
+                }
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = news.sourceName ?: "News",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(Modifier.height(7.dp))
 
                 Text(
                     text = news.title ?: "Untitled article",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    lineHeight = 20.sp
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(Modifier.height(10.dp))
+
+                HorizontalDivider(
+                    color = Color.White.copy(alpha = 0.15f)
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = news.author ?: news.sourceName ?: "Redaksi",
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontSize = 10.sp
+                    )
+
+                    Text(
+                        text = "Baca →",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NewsCard(
+    news: News,
+    onClick: (News) -> Unit,
+    isBookmarked: Boolean,
+    onBookmarkClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White)
+            .border(
+                1.dp,
+                Color(0xFFE2E8F0),
+                RoundedCornerShape(16.dp)
+            )
+            .clickable { onClick(news) }
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .height(88.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = (news.sourceName ?: "BERITA").uppercase(),
+                        color = MandiriBlue,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(text = "  •  ", color = TextSecondary)
+
+                    Text(
+                        text = news.author ?: news.sourceName ?: "Mandiri News",
+                        color = TextSecondary,
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(Modifier.height(5.dp))
 
                 Text(
+                    text = news.title ?: "Untitled article",
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF0F172A),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
                     text = news.publishedAt.toFormattedDate(),
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    fontSize = 10.sp,
+                    color = TextSecondary
+                )
+
+                Icon(
+                    imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                    contentDescription = "Simpan berita",
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clickable { onBookmarkClick() },
+                    tint = if (isBookmarked) RadiantGold else Color(0xFF94A3B8)
                 )
             }
         }
+
+        NewsImage(
+            imageUrl = news.imageUrl,
+            contentDescription = news.title,
+            modifier = Modifier
+                .size(88.dp)
+                .clip(RoundedCornerShape(12.dp))
+        )
     }
 }
